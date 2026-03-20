@@ -21,7 +21,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -1345,12 +1344,16 @@ func parseClockRange(s string) (r schema.ClockRange, ok bool) {
 	return schema.ClockRange{Start: t1, End: t2}, true
 }
 
-var cutDateRangeRe = sync.OnceValue(func() *regexp.Regexp {
+func makeCutDateRangeRe(alt bool) *regexp.Regexp {
 	var b strings.Builder
-	b.WriteString(`(?i)`)                 // case-insensitive
-	b.WriteString(`^`)                    // anchor
-	b.WriteString(`\s*`)                  // trim whitespace
-	b.WriteString(`(.+?)`)                // prefix
+	b.WriteString(`(?i)`) // case-insensitive
+	b.WriteString(`^`)    // anchor
+	b.WriteString(`\s*`)  // trim whitespace
+	if alt {
+		b.WriteString(`([^0-9,]+)`) // prefix (greedy, but exclude numbers and commas since they aren't usually in the label, and to ensure we don't accidentally remove a date)
+	} else {
+		b.WriteString(`(.+?)`) // prefix (non-greedy, won't accidentally cut out part of the date)
+	}
 	b.WriteString(`[ -]*[-][ -]*`)        // separator (spaces/dashes around at least one dash)
 	b.WriteString(`((?:(?:[a-z]+|)\s*)?`) // date range modifier
 	b.WriteString(`(?:`)                  // start of date range:
@@ -1380,7 +1383,10 @@ var cutDateRangeRe = sync.OnceValue(func() *regexp.Regexp {
 	b.WriteString(`\s*`)         // trim whitespace
 	b.WriteString(`$`)           // anchor
 	return regexp.MustCompile(b.String())
-})
+}
+
+var cutDateRangeRe = makeCutDateRangeRe(false)
+var cutDateRangeAltRe = makeCutDateRangeRe(true)
 
 // cutDateRange cuts s around the first match of spacs/dash characters followed
 // by a month+space, day+space, or day+comma or day (3 letters) and a
@@ -1390,7 +1396,14 @@ var cutDateRangeRe = sync.OnceValue(func() *regexp.Regexp {
 // note: we do it this way so we can be sure we didn't leave part of a date
 // behind with parseDateRange.
 func cutDateRange(s string) (prefix, dates string, ok bool) {
-	if m := cutDateRangeRe().FindStringSubmatch(s); m != nil {
+	if m := cutDateRangeRe.FindStringSubmatch(s); m != nil {
+		if _, dateValid := parseDateRange(m[2]); !dateValid {
+			if alt := cutDateRangeAltRe.FindStringSubmatch(s); alt != nil {
+				if _, altDateValid := parseDateRange(alt[2]); altDateValid {
+					return strings.TrimSpace(alt[1]), alt[2], true
+				}
+			}
+		}
 		return m[1], m[2], true
 	}
 	return s, "", false

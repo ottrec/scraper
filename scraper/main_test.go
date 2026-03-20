@@ -257,6 +257,9 @@ func TestParseDateRange(t *testing.T) {
 		{"Walter Baker Sports Centre - Weight and cardio room", 0, 0},
 		{"Plant Recreation Centre - all drop-ins{ - }August 30 and 31", 8_30_0, 8_31_0},
 
+		// special case (needs alternate regexp)
+		{"Lowertown Pool - March Break drop-in{ - }March 14 to 22", 3_14_0, 3_22_0},
+
 		// synthetic test cases
 		{"test{ - }dummy January 1", 0, 0},
 		{"test{ - }until January 1", 0, 1_01_0},
@@ -271,6 +274,12 @@ func TestParseDateRange(t *testing.T) {
 		{"test{ - }until February 29, 2001", 0, 0},
 		{"test{ - }until February 28, 20aa", 0, 0},
 		{"test{ - }until January 1 February", 0, 0},
+
+		// synthetic test cases (alternate regexp)
+		{"test - March test-thing{ - }until January 1", 0, 1_01_0},
+		{"test - March test-thing{ - }January 1 and 2", 1_01_0, 1_02_0},
+		{"test - March test-thing{ - }January 1, 2026 to December 31, 2026", 2026_01_01_0, 2026_12_31_0},
+		{"test - March test-thing{ - }January 1 to 31", 1_01_0, 1_31_0},
 		// TODO: more
 	} {
 		tcP, sep, _ := strings.Cut(tc.S, "{")
