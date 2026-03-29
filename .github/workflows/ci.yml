@@ -27,8 +27,8 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - run: go test -v ./...
@@ -40,10 +40,10 @@ jobs:
     if: ${{ github.repository == 'pgaskin/ottrec' }}
     steps:
       - name: Checkout scraper
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Authorize app
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ vars.OTTREC_SCRAPER_APP_ID }}
@@ -64,7 +64,7 @@ jobs:
             core.exportVariable('GIT_COMMITTER_EMAIL', email)
 
       - name: Checkout cache
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: pgaskin/ottrec-data
           ref: cache
@@ -75,7 +75,7 @@ jobs:
           persist-credentials: true
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
@@ -102,10 +102,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout scraper
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Authorize app
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ vars.OTTREC_SCRAPER_APP_ID }}
@@ -128,7 +128,7 @@ jobs:
         if: ${{ github.repository == 'pgaskin/ottrec' }}
 
       - name: Checkout cache
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: pgaskin/ottrec-data
           ref: cache
@@ -139,7 +139,7 @@ jobs:
           persist-credentials: true
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
