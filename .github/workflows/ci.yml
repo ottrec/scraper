@@ -144,7 +144,7 @@ jobs:
           go-version-file: go.mod
 
       - run: git -C cache worktree add ../data v1
-      - run: rm -fv data/*
+      - run: rm -fv data/data.*
       - run: go run ./scraper -cache cache -geocodio -scrape -export.pretty
           -export.proto data/data.proto
           -export.pb data/data.pb
