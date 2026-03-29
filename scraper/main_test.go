@@ -3,10 +3,15 @@ package main
 import (
 	"bytes"
 	"cmp"
+	"crypto/sha1"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"iter"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -229,6 +234,87 @@ func TestParseClockRange(t *testing.T) {
 		if c.End >= 2*24*60 {
 			t.Errorf("parse %q: start time should be before end of next day", tc.A)
 		}
+	}
+}
+
+var saveExhaustiveClockRange = flag.Bool("save-exhaustive-clock-range", false, `go test -run='^TestParseClockRangeExhaustive$' ./scraper/ -save-exhaustive-clock-range`)
+
+func TestParseClockRangeExhaustive(t *testing.T) {
+	// the full range of times in most formats (intended to cover all important
+	// logic, but not formatting normalization)
+	times := func(yield func(string) bool) {
+		if !yield("noon") || !yield("midnight") {
+			return
+		}
+		for hour := range 24 {
+			for minute := range 60 {
+				// don't bother trying every single minute, but at least get the main ones
+				if minute%5 != 0 && minute != 1 && minute != 59 {
+					continue
+				}
+				// this will be accepted as valid for both 12 and 24h
+				str := []byte{
+					'0' + byte(hour/10),
+					'0' + byte(hour%10),
+					':',
+					'0' + byte(minute/10),
+					'0' + byte(minute%10),
+				}
+				if str[0] == '0' {
+					str = str[1:]
+				}
+				if !yield(string(str)) {
+					return
+				}
+				if !yield(string(append(str, 'a', 'm'))) {
+					return
+				}
+				if !yield(string(append(str, 'p', 'm'))) {
+					return
+				}
+			}
+		}
+	}
+	var out bytes.Buffer
+	for lhs := range times {
+		for rhs := range times {
+			s := lhs + "-" + rhs
+			r, ok := parseClockRange(s)
+			if !ok {
+				fmt.Fprintf(&out, "%-16s ERR\n", s)
+			} else {
+				fmt.Fprintf(&out, "%-16s %s\n", s, r.Format(false))
+			}
+		}
+	}
+	nbuf := out.Bytes()
+	if *saveExhaustiveClockRange {
+		if err := os.WriteFile("clockrange.txt", nbuf, 0644); err != nil {
+			panic(err)
+		}
+	}
+	if obuf, err := os.ReadFile("clockrange.txt"); err == nil {
+		next1, stop1 := iter.Pull(bytes.Lines(obuf))
+		defer stop1()
+		next2, stop2 := iter.Pull(bytes.Lines(nbuf))
+		defer stop2()
+		for {
+			line1, ok1 := next1()
+			line2, ok2 := next2()
+			if !ok1 && !ok2 {
+				break
+			}
+			if !ok1 || !ok2 {
+				panic("line count mismatch")
+			}
+			if !bytes.Equal(line1, line2) {
+				t.Errorf("diff:\n\told: %s\n\tnew: %s", line1[:len(line1)-1], line2[:len(line2)-1])
+			}
+		}
+	}
+	sha := sha1.Sum(nbuf)
+	if hex.EncodeToString(sha[:]) != "bb6c9d4fe05284ed3d85bfea35c6a6fb63264fd3" {
+		t.Errorf("changed: %x", sha)
 	}
 }
 
