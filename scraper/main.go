@@ -997,6 +997,9 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 							if r.Start > 24*60 || r.End > 24*60 {
 								slog.Warn("note: time range goes into the next day", "raw", t, "parsed", r)
 							}
+						} else if strings.Trim(t, "\u00a0") == "" {
+							slog.Warn("failed to parse time range consisting of nbsps (probably a benign typo)", "range", t)
+							xerrs = append(xerrs, fmt.Sprintf("warning: failed to parse blank time range %q (this is probably a typo)", t))
 						} else {
 							slog.Warn("failed to parse time range", "range", t)
 							xerrs = append(xerrs, fmt.Sprintf("warning: failed to parse time range %q", t))
