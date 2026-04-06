@@ -103,7 +103,7 @@ jobs:
           -export.errors errors.txt
 
       - name: Commit data
-        run: git -C data add . && go run github.com/pgaskin/push-signed-commits@v0.0.4 -C data -app ${{ vars.OTTREC_SCRAPER_APP_ID }} -commit pgaskin/ottrec-data data "update (${{github.event_name}} ${{github.repository}}@${{github.sha}}, $(git -C cache rev-parse HEAD))"$'\n'"$(<errors.txt)"
+        run: git -C data add . && go run github.com/pgaskin/push-signed-commits@v0.0.4 -C data -app ${{ vars.OTTREC_SCRAPER_APP_ID }} -commit pgaskin/ottrec-data v1 "update (${{github.event_name}} ${{github.repository}}@${{github.sha}}, $(git -C cache rev-parse HEAD))"$'\n'"$(<errors.txt)"
         env:
           APP_PRIVATE_KEY: ${{ secrets.OTTREC_SCRAPER_PRIVATE_KEY }}
         if: ${{ github.repository == 'pgaskin/ottrec' }}
