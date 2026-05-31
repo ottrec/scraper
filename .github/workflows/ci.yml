@@ -56,10 +56,10 @@ jobs:
           go-version-file: go.mod
 
       - run: go run ./scraper -cache cache -geocodio -fetch
-          ${{ (inputs.zyte) && '-zyte 150' || '' }}
-          ${{ (inputs.purge_listing || github.event_name == 'schedule') && '-cache.purge.listing' || '' }}
-          ${{ (inputs.purge_facility || github.event_name == 'schedule') && '-cache.purge.facility' || '' }}
-          ${{ (inputs.purge_geocode) && '-cache.purge.geocode' || '' }}
+          ${{ case(inputs.zyte == true, '-zyte 150', '') }}
+          ${{ case(inputs.purge_listing == true || github.event_name == 'schedule', '-cache.purge.listing', '') }}
+          ${{ case(inputs.purge_facility == true || github.event_name == 'schedule', '-cache.purge.facility', '') }}
+          ${{ case(inputs.purge_geocode == true, '-cache.purge.geocode', '') }}
         env:
           ZYTE_APIKEY: ${{ secrets.zyte_apikey }}
           GEOCODIO_APIKEY: ${{ secrets.geocodio_apikey }}
@@ -69,7 +69,7 @@ jobs:
       - uses: pgaskin/push-signed-commits@v1
         with:
           path: cache
-          commit-message: ${{(github.event_name=='schedule'&&'full')||(github.event_name=='workflow_dispatch'&&'manual')||'partial'}} update (${{github.event_name}} ${{github.repository}}@${{github.sha}})
+          commit-message: ${{ case(github.event_name == 'schedule', 'full', github.event_name == 'workflow_dispatch', 'manual', 'partial') }} update (${{github.event_name}} ${{github.repository}}@${{github.sha}})
           repository: pgaskin/ottrec-data
           branch: cache
           app-id: ${{ vars.OTTREC_SCRAPER_APP_ID }}
@@ -106,9 +106,13 @@ jobs:
           -export.errors errors.txt
 
       - run: git -C data add .
-      - run: printf '%s\n' 'errors<<EOF' "$(<errors.txt)" 'EOF' 'cache<<EOF' "$(git -C cache rev-parse HEAD)" 'EOF' | tee -a "$GITHUB_OUTPUT"
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            core.setOutput('errors', require('fs').readFileSync('errors.txt', 'utf8').trimEnd())
+            core.setOutput('cache', require('child_process').execSync('git -C cache rev-parse HEAD').toString().trim())
         id: meta
-      - uses: pgaskin/push-signed-commits@v0.0.7
+      - uses: pgaskin/push-signed-commits@v1
         with:
           path: data
           commit-message: |
