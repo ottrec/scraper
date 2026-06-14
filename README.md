@@ -2,7 +2,7 @@
 
 City of Ottawa drop-in recreation schedule data scraper.
 
-I will be making a website for this soon.
+I've made a website for it: [ottrec.ca](https://ottrec.ca).
 
 ### Usage
 
