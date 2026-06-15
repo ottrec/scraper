@@ -423,7 +423,7 @@ func (d DateRange) GoTime(loc *time.Location) (from time.Time, to time.Time, ok 
 	from, fromOK := d.From.GoTime(loc)
 	to, toOK := d.To.GoTime(loc)
 	if toOK && !to.IsZero() {
-		to.AddDate(0, 0, 1).Add(-time.Nanosecond)
+		to = to.AddDate(0, 0, 1).Add(-time.Nanosecond)
 	}
 	return from, to, fromOK && toOK
 }
