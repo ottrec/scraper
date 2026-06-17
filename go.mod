@@ -1,4 +1,4 @@
-module github.com/pgaskin/ottrec
+module github.com/ottrec/scraper
 
 go 1.26.1
 

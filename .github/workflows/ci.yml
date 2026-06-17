@@ -37,7 +37,7 @@ jobs:
     needs: [test]
     name: Update cached pages
     runs-on: ubuntu-latest
-    if: ${{ github.repository == 'pgaskin/ottrec' }}
+    if: ${{ github.repository == 'ottrec/scraper' }}
     steps:
       - name: Checkout scraper
         uses: actions/checkout@v6
@@ -45,7 +45,7 @@ jobs:
       - name: Checkout cache
         uses: actions/checkout@v6
         with:
-          repository: pgaskin/ottrec-data
+          repository: ottrec/data
           ref: cache
           path: cache
           filter: blob:none
@@ -70,7 +70,7 @@ jobs:
         with:
           path: cache
           commit-message: ${{ case(github.event_name == 'schedule', 'full', github.event_name == 'workflow_dispatch', 'manual', 'partial') }} update (${{github.event_name}} ${{github.repository}}@${{github.sha}})
-          repository: pgaskin/ottrec-data
+          repository: ottrec/data
           branch: cache
           app-id: ${{ vars.OTTREC_SCRAPER_APP_ID }}
           app-key: ${{ secrets.OTTREC_SCRAPER_PRIVATE_KEY }}
@@ -86,7 +86,7 @@ jobs:
       - name: Checkout cache
         uses: actions/checkout@v6
         with:
-          repository: pgaskin/ottrec-data
+          repository: ottrec/data
           ref: cache
           path: cache
           filter: blob:none
@@ -119,8 +119,8 @@ jobs:
             update (${{github.event_name}} ${{github.repository}}@${{github.sha}}, ${{steps.meta.outputs.cache}})
 
             ${{steps.meta.outputs.errors}}
-          repository: pgaskin/ottrec-data
+          repository: ottrec/data
           branch: v1
           app-id: ${{ vars.OTTREC_SCRAPER_APP_ID }}
           app-key: ${{ secrets.OTTREC_SCRAPER_PRIVATE_KEY }}
-        if: ${{ github.repository == 'pgaskin/ottrec' }}
+        if: ${{ github.repository == 'ottrec/scraper' }}

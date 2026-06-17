@@ -17,7 +17,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/expr-lang/expr"
-	"github.com/pgaskin/ottrec/schema"
+	"github.com/ottrec/scraper/schema"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

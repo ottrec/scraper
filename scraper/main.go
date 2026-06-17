@@ -25,9 +25,9 @@ import (
 	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/pgaskin/ottrec/internal/httpcache"
-	"github.com/pgaskin/ottrec/internal/zyte"
-	"github.com/pgaskin/ottrec/schema"
+	"github.com/ottrec/scraper/internal/httpcache"
+	"github.com/ottrec/scraper/internal/zyte"
+	"github.com/ottrec/scraper/schema"
 	textpbfmt "github.com/protocolbuffers/txtpbfmt/parser"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -388,7 +388,7 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("less than 100 facilities returned, something might be wrong")
 	}
 	if *Scrape {
-		data.Attribution = append(data.Attribution, "Compiled data © Patrick Gaskin. https://github.com/pgaskin/ottrec")
+		data.Attribution = append(data.Attribution, "Compiled data © Patrick Gaskin. https://github.com/ottrec/scraper")
 		data.Attribution = append(data.Attribution, "Facility information and schedules © City of Ottawa. "+listing)
 		for _, attrib := range slices.Sorted(maps.Keys(geoAttrib)) {
 			data.Attribution = append(data.Attribution, "Address data "+strings.TrimPrefix(attrib, "Data "))
