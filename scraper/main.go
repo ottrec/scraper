@@ -877,8 +877,11 @@ func scrapeScheduleGroup(doc *goquery.Document, facilityName, label string, cont
 		if req, ok := parseReservationRequirement(el.Text()); ok {
 			if req {
 				if len(group.ReservationLinks) == 0 {
-					slog.Warn("unexpected top-level reservation required text without reservation links")
-					xerrs = append(xerrs, "unexpected top-level reservation required text without reservation links")
+					// only if we have schedules (TODO: refactor this check to not duplicate code)
+					if content.Find("table").Length() != 0 {
+						slog.Warn("unexpected top-level reservation required text without reservation links")
+						xerrs = append(xerrs, "unexpected top-level reservation required text without reservation links")
+					}
 				}
 				continue
 			}
