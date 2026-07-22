@@ -987,6 +987,9 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 					}
 					timesStr := cell.Text()
 					timesStr = playFreeRe.ReplaceAllString(timesStr, "")
+					if strings.Trim(strings.ToLower(strings.TrimSpace(timesStr)), ".") == "closed" {
+						timesStr = ""
+					}
 					times := []*schema.TimeRange{}
 					for t := range strings.FieldsFuncSeq(timesStr, func(r rune) bool {
 						return r == ','
