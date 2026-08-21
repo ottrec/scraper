@@ -904,13 +904,43 @@ func scrapeScheduleGroup(doc *goquery.Document, facilityName, label string, cont
 	return group.Build(), xerrs
 }
 
+var monthNameRe = regexp.MustCompile(`(?i)\b(january|february|march|april|may|june|july|august|september|october|november|december)\b`)
+
+// scheduleCaption gets the caption for a schedule table. Some pages put it in a
+// paragraph before the table instead of a caption element, so fall back to that
+// if it looks like a caption rather than unrelated text, i.e., it has a month
+// name, or the facility name and no sentence punctuation (after normalization).
+//
+// This was first seen on 2026-08-21, affecting 6/54 of the added fall
+// schedules. It is unclear if this is a mistake, but it seems to be since it's
+// just three arenas, it's not consistent across pages, and even more
+// concerningly, uniquely for those schedule pages, there was a bunch of Word
+// paste HTML pollution...
+func scheduleCaption(table *goquery.Selection, facilityName string) string {
+	if caption := normalizeText(table.Find("caption").First().Text(), false, false); caption != "" {
+		return caption
+	}
+	prev := table.Prev()
+	if !prev.Is("p") {
+		return ""
+	}
+	caption := normalizeText(prev.Text(), false, false)
+	if monthNameRe.MatchString(caption) {
+		return caption
+	}
+	if facilityName != "" && !strings.Contains(caption, ".") && strings.Contains(strings.ToLower(caption), strings.ToLower(facilityName)) {
+		return caption
+	}
+	return ""
+}
+
 var playFreeRe = regexp.MustCompile(`(?i)\(?\s*Play\s+Free\s*\)?`)
 
 // scrapeSchedule scrapes a schedule table, returning nil on failure, and
 // returning a slice of warnings/errors from parsing the schedule.
 func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.Schedule, xerrs []string) {
 	var schedule schema.Schedule_builder
-	schedule.Caption = normalizeText(table.Find("caption").First().Text(), false, false)
+	schedule.Caption = scheduleCaption(table, facilityName)
 
 	// date range suffix
 	name, date, ok := cutDateRange(schedule.Caption)
