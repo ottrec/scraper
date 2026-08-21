@@ -1150,9 +1150,9 @@ func extractScheduleGroupTitle(s string) (title string) {
 	return
 }
 
-// ageRangeRe matches things like "12+", "(18+)", and "(50 +)", also capturing
-// the surrounding dashes/whitespace.
-var ageRangeRe = regexp.MustCompile(`(^|[\s-]+)\(?(?:ages\s+)?([0-9]+)(?:\s*\+)\)?([\s(-]+|$)`) // capture: pre-sep age post-sep
+// ageRangeRe matches things like "12+", "(18+)", "(50 +)", and "(18+ years)",
+// also capturing the surrounding dashes/whitespace and trailing "years)".
+var ageRangeRe = regexp.MustCompile(`(^|[\s-]+)\(?(?:ages\s+)?([0-9]+)(?:\s*\+)(?:\s*(?:years?|yrs?)(?:\s+old)?)?\)?([\s(-]+|$)`) // capture: pre-sep age post-sep
 
 // cutAgeMin removes the age minimum from activity, returning it as an int.
 func cutAgeMin(activity string) (string, int, bool) {
