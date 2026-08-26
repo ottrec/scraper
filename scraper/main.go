@@ -912,23 +912,26 @@ var monthNameRe = regexp.MustCompile(`(?i)\b(january|february|march|april|may|ju
 // name, or the facility name and no sentence punctuation (after normalization).
 //
 // This was first seen on 2026-08-21, affecting 6/54 of the added fall
-// schedules. It is unclear if this is a mistake, but it seems to be since it's
-// just three arenas, it's not consistent across pages, and even more
-// concerningly, uniquely for those schedule pages, there was a bunch of Word
-// paste HTML pollution...
+// schedules. Interestingly, there was also a bunch of MS Office HTML junk on
+// those too. This was confirmed to be a mistake on 2026-08-26, but I'm keeping
+// the edge case handling here since it's simple and unlikely to result in false
+// positives (and I don't trust the city staff not to do it again).
 func scheduleCaption(table *goquery.Selection, facilityName string) string {
 	if caption := normalizeText(table.Find("caption").First().Text(), false, false); caption != "" {
 		return caption
 	}
+	slog.Warn("missing or empty table <caption> element", "facility", facilityName)
 	prev := table.Prev()
 	if !prev.Is("p") {
 		return ""
 	}
 	caption := normalizeText(prev.Text(), false, false)
 	if monthNameRe.MatchString(caption) {
+		slog.Warn("using previous <p> as caption since it has a month")
 		return caption
 	}
 	if facilityName != "" && !strings.Contains(caption, ".") && strings.Contains(strings.ToLower(caption), strings.ToLower(facilityName)) {
+		slog.Warn("using previous <p> as caption since it has the facility name and looks like one")
 		return caption
 	}
 	return ""
