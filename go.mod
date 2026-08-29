@@ -1,6 +1,6 @@
 module github.com/ottrec/scraper
 
-go 1.26.1
+go 1.27.0
 
 tool google.golang.org/protobuf/cmd/protoc-gen-go
 
