@@ -64,6 +64,17 @@ func TestDate(t *testing.T) {
 		t.Fatal("bad gostring")
 	}
 
+	// round-trip zero times
+	if d := MakeDateFromGo(time.Time{}); !d.IsZero() {
+		t.Fatalf("zero time should be a zero date, got %#v", d)
+	}
+	if x, ok := Date(0).GoTime(time.UTC); !ok || !x.IsZero() {
+		t.Fatal("zero date should be a zero time")
+	}
+	if d := MakeDateFromGo(time.Date(2222, time.November, 21, 12, 0, 0, 0, time.UTC)); d != 2222_11_21_5 {
+		t.Fatalf("bad date from go time: %#v", d)
+	}
+
 	for _, tc := range []struct {
 		D1, D2 Date
 		Result string

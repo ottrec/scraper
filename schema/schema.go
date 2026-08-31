@@ -183,6 +183,9 @@ func MakeDate(year int, month time.Month, day int, wkday time.Weekday) Date {
 // from a Go [time.Time]. If t is [time.Time.IsZero], the [Date] is also
 // [Date.IsZero].
 func MakeDateFromGo(t time.Time) Date {
+	if t.IsZero() {
+		return 0
+	}
 	year, month, day := t.Date()
 	return MakeDate(year, month, day, t.Weekday())
 }
