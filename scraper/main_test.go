@@ -499,8 +499,11 @@ func TestParseLooseDate(t *testing.T) {
 		{"nov", 11_00_0},
 		{"dec", 12_00_0},
 
-		{"Monday Mon, October 6, 2025", 0},  // duplicate weekday
-		{"Monday, October Oct 6, 2025", 0},  // duplicate monthv
+		{"Monday Mon, October 6, 2025", 2025_10_06_2}, // duplicate weekday
+		{"Tuesday, Tuesday, June 23", 6_23_3},         // same
+
+		{"Monday Tue, October 6, 2025", 0},  // conflicting duplicate weekday
+		{"Monday, October Oct 6, 2025", 0},  // duplicate month
 		{"Monday, October 06 6, 2025", 0},   // duplicate day
 		{"Monday, October 6, 2025 2025", 0}, // duplicate year
 		{"Monday, October 1, 2025", 0},      // wrong weekday

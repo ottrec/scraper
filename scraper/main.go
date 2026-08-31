@@ -1649,9 +1649,11 @@ func parseLooseDate(s string) (schema.Date, bool) {
 			continue
 		}
 		if segWkday != -1 {
-			if w != -1 {
-				return 0, false // duplicate weekday
+			if w != -1 && w != segWkday {
+				return 0, false // conflicting weekday
 			}
+			// tolerate duplicate weekday typo, e.g., "Tuesday, Tuesday, June
+			// 23" (plant, 2026-06-23)
 			w = segWkday
 			continue
 		}
