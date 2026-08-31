@@ -109,8 +109,29 @@ jobs:
       - uses: actions/github-script@v9
         with:
           script: |
-            core.setOutput('errors', require('fs').readFileSync('errors.txt', 'utf8').trimEnd())
-            core.setOutput('cache', require('child_process').execSync('git -C cache rev-parse HEAD').toString().trim())
+            const { readFileSync } = require('fs')
+            const git = (...a) => require('child_process').execSync('git ' + a.join(' '), {maxBuffer: 1 << 28}).toString()
+
+            const blocks = []
+            const list = (heading, us) => us.length && blocks.push([heading, ...us.sort().map((u) => '- ' + u)].join('\n'))
+
+            // scrape errors
+            const errors = readFileSync('errors.txt', 'utf8').trim()
+            if (errors) blocks.push(errors)
+
+            // added/removed facilities
+            try {
+              const urls = s => new Set(JSON.parse(s).facilities.map((f) => f.source.url))
+              const prev = urls(git('-C', 'data', 'show', 'HEAD:data.json'))
+              const next = urls(readFileSync('data/data.json', 'utf8'))
+              list('Added:', [...next].filter((u) => !prev.has(u)))
+              list('Removed:', [...prev].filter((u) => !next.has(u)))
+            } catch (ex) {
+              core.warning('failed to diff facilities: ' + ex)
+            }
+
+            core.setOutput('body', blocks.join('\n\n'))
+            core.setOutput('cache', git('-C', 'cache', 'rev-parse', 'HEAD').trim())
         id: meta
       - uses: pgaskin/push-signed-commits@v1
         with:
@@ -118,7 +139,7 @@ jobs:
           commit-message: |
             update (${{github.event_name}} ${{github.repository}}@${{github.sha}}, ${{steps.meta.outputs.cache}})
 
-            ${{steps.meta.outputs.errors}}
+            ${{steps.meta.outputs.body}}
           repository: ottrec/data
           branch: v1
           app-id: ${{ vars.OTTREC_SCRAPER_APP_ID }}
