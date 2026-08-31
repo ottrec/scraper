@@ -29,6 +29,7 @@ import (
 	"github.com/ottrec/scraper/internal/zyte"
 	"github.com/ottrec/scraper/schema"
 	textpbfmt "github.com/protocolbuffers/txtpbfmt/parser"
+	"golang.org/x/net/html"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"golang.org/x/text/unicode/norm"
@@ -917,7 +918,7 @@ var monthNameRe = regexp.MustCompile(`(?i)\b(january|february|march|april|may|ju
 // the edge case handling here since it's simple and unlikely to result in false
 // positives (and I don't trust the city staff not to do it again).
 func scheduleCaption(table *goquery.Selection, facilityName string) string {
-	if caption := normalizeText(table.Find("caption").First().Text(), false, false); caption != "" {
+	if caption := normalizeText(nodeText(table.Find("caption").First(), ' '), false, false); caption != "" {
 		return caption
 	}
 	slog.Warn("missing or empty table <caption> element", "facility", facilityName)
@@ -925,7 +926,7 @@ func scheduleCaption(table *goquery.Selection, facilityName string) string {
 	if !prev.Is("p") {
 		return ""
 	}
-	caption := normalizeText(prev.Text(), false, false)
+	caption := normalizeText(nodeText(prev, ' '), false, false)
 	if monthNameRe.MatchString(caption) {
 		slog.Warn("using previous <p> as caption since it has a month")
 		return caption
@@ -981,7 +982,7 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 		if schedule.Days == nil {
 			for i, cell := range cells.EachIter() {
 				if i != 0 {
-					schedule.Days = append(schedule.Days, strings.Join(strings.Fields(cell.Text()), " "))
+					schedule.Days = append(schedule.Days, strings.Join(strings.Fields(nodeText(cell, ' ')), " "))
 				}
 			}
 			schedule.XDaydates = make([]int32, len(schedule.Days))
@@ -1006,8 +1007,9 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 			}
 			for i, cell := range cells.EachIter() {
 				if i == 0 {
-					activity.Label = normalizeText(cell.Text(), false, false)
-					activity.XName = cleanActivityName(cell.Text())
+					label := nodeText(cell, ' ')
+					activity.Label = normalizeText(label, false, false)
+					activity.XName = cleanActivityName(label)
 					if _, resv, ok := cutReservationRequirement(activity.Label); ok {
 						activity.XResv = new(resv)
 					}
@@ -1028,7 +1030,7 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 					if wkday == -1 {
 						xerrs = append(xerrs, fmt.Sprintf("warning: failed to parse weekday from header %q", hdr))
 					}
-					timesStr := cell.Text()
+					timesStr := nodeText(cell, ' ')
 					timesStr = playFreeRe.ReplaceAllString(timesStr, "")
 					if strings.Trim(strings.ToLower(strings.TrimSpace(timesStr)), ".") == "closed" {
 						timesStr = ""
@@ -1078,6 +1080,43 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 		return nil, xerrs
 	}
 	return schedule.Build(), xerrs
+}
+
+var blockElements = map[string]bool{
+	"br": true, "p": true, "div": true, "li": true, "ul": true, "ol": true,
+	"tr": true, "table": true, "blockquote": true, "hr": true,
+	"h1": true, "h2": true, "h3": true, "h4": true, "h5": true, "h6": true,
+}
+
+// nodeText is like [goquery.Selection.Text], but inserts sep at block elements
+// boundaries. It doesn't elide whitespace. This neutralizes quite a few city
+// typos and spacing inconsistencies (e.g., "Saturday<br>*Play Free", "Cardio
+// and strength -<br>older adult", or "2:30 - 3:30 pm<br>7 - 8 pm").
+func nodeText(sel *goquery.Selection, sep rune) string {
+	var b strings.Builder
+	var fn func(*html.Node)
+	fn = func(n *html.Node) {
+		for c := range n.ChildNodes() {
+			switch c.Type {
+			case html.TextNode:
+				b.WriteString(c.Data)
+			case html.ElementNode:
+				if blockElements[c.Data] {
+					b.WriteRune(sep)
+					fn(c)
+					b.WriteRune(sep)
+				} else {
+					fn(c)
+				}
+			default:
+				fn(c)
+			}
+		}
+	}
+	for _, n := range sel.Nodes {
+		fn(n)
+	}
+	return b.String()
 }
 
 // normalizeText performs various transformations on s:
