@@ -955,6 +955,8 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 		} else {
 			xerrs = append(xerrs, fmt.Sprintf("schedule %q: failed to parse date range %q", schedule.Caption, date))
 		}
+	} else if monthNameRe.MatchString(schedule.Caption) {
+		xerrs = append(xerrs, fmt.Sprintf("schedule %q: caption has a month name, but no date range was found", schedule.Caption))
 	}
 	// " schedule" suffix
 	name = strings.TrimSpace(strings.TrimSuffix(strings.ToLower(name), " schedule"))
@@ -1404,7 +1406,7 @@ func parseClockRange(s string) (r schema.ClockRange, ok bool) {
 	return schema.ClockRange{Start: t1, End: t2}, true
 }
 
-func makeCutDateRangeRe(alt bool) *regexp.Regexp {
+func makeCutDateRangeRe(alt, nosep bool) *regexp.Regexp {
 	var b strings.Builder
 	b.WriteString(`(?i)`) // case-insensitive
 	b.WriteString(`^`)    // anchor
@@ -1414,7 +1416,11 @@ func makeCutDateRangeRe(alt bool) *regexp.Regexp {
 	} else {
 		b.WriteString(`(.+?)`) // prefix (non-greedy, won't accidentally cut out part of the date)
 	}
-	b.WriteString(`[ -]*[-][ -]*`)        // separator (spaces/dashes around at least one dash)
+	if nosep {
+		b.WriteString(`[ -]*`) // separator (optional, last resort attempt if no date range found)
+	} else {
+		b.WriteString(`[ -]*[-][ -]*`) // separator (spaces/dashes around at least one dash)
+	}
 	b.WriteString(`((?:(?:[a-z]+|)\s*)?`) // date range modifier
 	b.WriteString(`(?:`)                  // start of date range:
 	b.WriteString(`(?:`)                  // ... month
@@ -1445,8 +1451,10 @@ func makeCutDateRangeRe(alt bool) *regexp.Regexp {
 	return regexp.MustCompile(b.String())
 }
 
-var cutDateRangeRe = makeCutDateRangeRe(false)
-var cutDateRangeAltRe = makeCutDateRangeRe(true)
+var cutDateRangeRe = makeCutDateRangeRe(false, false)
+var cutDateRangeAltRe = makeCutDateRangeRe(true, false)
+var cutDateRangeNoSepRe = makeCutDateRangeRe(false, true)
+var cutDateRangeNoSepAltRe = makeCutDateRangeRe(true, true)
 
 // cutDateRange cuts s around the first match of spacs/dash characters followed
 // by a month+space, day+space, or day+comma or day (3 letters) and a
@@ -1465,6 +1473,16 @@ func cutDateRange(s string) (prefix, dates string, ok bool) {
 			}
 		}
 		return m[1], m[2], true
+	}
+	// fallback if the date range isn't prefixed by a dash, and implying it
+	// would result in a open or closed date range (but not a single date for
+	// now, since that is more likely to be a truncated date range)
+	for _, re := range []*regexp.Regexp{cutDateRangeNoSepRe, cutDateRangeNoSepAltRe} {
+		if m := re.FindStringSubmatch(s); m != nil {
+			if r, dateValid := parseDateRange(m[2]); dateValid && r.From != r.To {
+				return strings.TrimSpace(m[1]), m[2], true
+			}
+		}
 	}
 	return s, "", false
 }

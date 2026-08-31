@@ -361,6 +361,9 @@ func TestParseDateRange(t *testing.T) {
 		// special case (needs alternate regexp)
 		{"Lowertown Pool - March Break drop-in{ - }March 14 to 22", 3_14_0, 3_22_0},
 
+		// special case (no separator before the date range)
+		{"Nepean Sportsplex - Swim and Aquafit{ }September 14 to December 20", 9_14_0, 12_20_0},
+
 		// synthetic test cases
 		{"test{ - }dummy January 1", 0, 0},
 		{"test{ - }until January 1", 0, 1_01_0},
@@ -381,6 +384,15 @@ func TestParseDateRange(t *testing.T) {
 		{"test - March test-thing{ - }January 1 and 2", 1_01_0, 1_02_0},
 		{"test - March test-thing{ - }January 1, 2026 to December 31, 2026", 2026_01_01_0, 2026_12_31_0},
 		{"test - March test-thing{ - }January 1 to 31", 1_01_0, 1_31_0},
+
+		// synthetic test cases (no separator)
+		{"test test{ }January 1 to 31", 1_01_0, 1_31_0},
+		{"test January test{ }January 1 to 31", 1_01_0, 1_31_0},
+		{"test test{ }starting January 1", 1_01_0, 0},
+		{"test January", 0, 0},
+		{"test dummy January 1", 0, 0},        // single date doesn't imply separator fallback (for now)
+		{"test 2 test January 1 to 31", 0, 0}, // stray number prevents fallback (for now)
+
 		// TODO: more
 	} {
 		tcP, sep, _ := strings.Cut(tc.S, "{")
