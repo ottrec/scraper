@@ -12,6 +12,7 @@ import (
 	"iter"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -155,6 +156,12 @@ func TestParseClockRange(t *testing.T) {
 		// misc special
 		{"noon-12:55pm", "12:00 - 12:55"},
 		{"midnight-12:55am", "00:00 - 00:55"},
+
+		// trailing period (the source sometimes ends a line with one)
+		{"6:30 - 10 am.", "06:30 - 10:00"},
+		{"11:45 am - 1 pm..", "11:45 - 13:00"},
+		{".", ""},
+		{"-.", ""},
 
 		// misc important somewhat ambiguous cases (the meaning of these must not be changed)
 		{"midnight-noon", "00:00 - 12:00"},
@@ -528,6 +535,54 @@ func TestParseLooseDate(t *testing.T) {
 		if tc.D != d {
 			t.Errorf("parse %q: expected %#v, got %#v", tc.S, tc.D, d)
 			continue
+		}
+	}
+}
+
+func TestSplitTimesSeq(t *testing.T) {
+	for _, tc := range []struct {
+		S string
+		E []string
+	}{
+		// note: most of these are real examples
+
+		// commas
+		{"9 - 10 am", []string{"9 - 10 am"}},
+		{"9 - 10 am, 11 am - noon", []string{"9 - 10 am", " 11 am - noon"}},
+		{"9 - 10 am,, 11 am - noon", []string{"9 - 10 am", " 11 am - noon"}}, // double-comma typo
+
+		// random benign whitespace (as usual)
+		{"9 - 10 am,\n11 am - noon", []string{"9 - 10 am", "11 am - noon"}},
+		{"2:30 - 3:30 pm\n7 - 8 pm", []string{"2:30 - 3:30 pm", "7 - 8 pm"}},
+		{"\n9 - 10 am\n\n7 - 8 pm\n", []string{"9 - 10 am", "7 - 8 pm"}},
+		{"9 - 10 am,\u00a0\n\n11 am - noon", []string{"9 - 10 am", "11 am - noon"}},
+		{"9 - 10 am, 11 am - noon\n1 - 2 pm", []string{"9 - 10 am", " 11 am - noon", "1 - 2 pm"}},
+		{"7 -\n8 pm", []string{"7 - 8 pm"}},
+		{"Noon\n- 1 pm", []string{"Noon - 1 pm"}},
+
+		// don't split invalid ranges or garbage on newlines
+		{"8:30 \u2013\n9:30 am", []string{"8:30 \u2013 9:30 am"}},
+		{"9 - 10 am\nPlay Free", []string{"9 - 10 am Play Free"}},
+		{"9 - 10 am\n11 am\n- noon", []string{"9 - 10 am 11 am", "- noon"}},
+
+		// keep blank cells, elide blank whitespace-delimited ranges
+		{"", nil},
+		{"\u00a0", []string{"\u00a0"}},
+		{"\n\u00a0\n", []string{"\u00a0"}},
+		{"1 - 3 pm\n", []string{"1 - 3 pm"}},
+		{"9 - 10 am\n\u00a0", []string{"9 - 10 am"}},
+		{"9 - 10 am,\u00a0\n", []string{"9 - 10 am"}},
+		{"\n", nil},
+
+		// don't elide blank comma-delimited ranges
+		{"9 - 10 am, \u00a0", []string{"9 - 10 am", " \u00a0"}},
+		{"9 - 10 am,\u00a0,11 am - noon", []string{"9 - 10 am", "\u00a0", "11 am - noon"}},
+		{"\u00a0,9 - 10 am", []string{"\u00a0", "9 - 10 am"}},
+		{"9 - 10 am,\u00a0\n11 am - noon,\u00a0", []string{"9 - 10 am", "11 am - noon", "\u00a0"}},
+	} {
+		s := strings.ReplaceAll(tc.S, "\n", string(splitTimesSeqLineSep))
+		if got := slices.Collect(splitTimesSeq(s)); !slices.Equal(got, tc.E) {
+			t.Errorf("split(%q): expected %q, got %q", tc.S, tc.E, got)
 		}
 	}
 }

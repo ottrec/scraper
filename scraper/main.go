@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"iter"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/ottrec/scraper/internal/httpcache"
@@ -1030,15 +1032,13 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 					if wkday == -1 {
 						xerrs = append(xerrs, fmt.Sprintf("warning: failed to parse weekday from header %q", hdr))
 					}
-					timesStr := nodeText(cell, ' ')
+					timesStr := nodeText(cell, splitTimesSeqLineSep)
 					timesStr = playFreeRe.ReplaceAllString(timesStr, "")
-					if strings.Trim(strings.ToLower(strings.TrimSpace(timesStr)), ".") == "closed" {
+					if strings.Trim(strings.ToLower(strings.TrimSpace(strings.ReplaceAll(timesStr, string(splitTimesSeqLineSep), " "))), ".") == "closed" {
 						timesStr = ""
 					}
 					times := []*schema.TimeRange{}
-					for t := range strings.FieldsFuncSeq(timesStr, func(r rune) bool {
-						return r == ','
-					}) {
+					for t := range splitTimesSeq(timesStr) {
 						if strings.Map(func(r rune) rune {
 							if unicode.IsSpace(r) {
 								return -1
@@ -1080,6 +1080,92 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 		return nil, xerrs
 	}
 	return schedule.Build(), xerrs
+}
+
+const splitTimesSeqLineSep = '\x1e'
+
+// splitTimesSeq yields time ranges from a schedule table cell, separated by
+// commas, lines/block-elements (see [splitTimesSeqLineSep]), or both.
+//
+// A line only starts a new time range if the text on both sides of it has a
+// dash (i.e., so "7 -<br>8 pm" doesn't get split incorrectly, and so typos
+// aren't split unnecessarily making errors confusing).
+//
+// Blank ranges are skipped, except ones explicitly delimited with a comma, or
+// where the whole cell itself is empty (so they still show as parse errors).
+func splitTimesSeq(s string) iter.Seq[string] {
+	type segment struct {
+		str        string
+		prev, next rune // delimiter, or zero for start/end
+	}
+	var (
+		segments []segment
+		prev     rune
+		start    int
+	)
+	for i, r := range s {
+		if r == ',' || r == splitTimesSeqLineSep {
+			segments = append(segments, segment{s[start:i], prev, r})
+			prev, start = r, i+utf8.RuneLen(r)
+		}
+	}
+	segments = append(segments, segment{s[start:], prev, 0})
+
+	empty := !slices.ContainsFunc(segments, func(sg segment) bool {
+		return strings.TrimSpace(sg.str) != ""
+	})
+
+	hasDash := func(s string) bool {
+		return strings.ContainsFunc(s, func(r rune) bool {
+			return unicode.Is(unicode.Pd, r)
+		})
+	}
+
+	return func(yield func(string) bool) {
+		var (
+			cur  string
+			have bool
+		)
+		flush := func() bool {
+			if !have {
+				return true
+			}
+			t := cur
+			cur, have = "", false
+			return yield(t)
+		}
+		for _, sg := range segments {
+			if sg.str == "" {
+				continue
+			}
+			if strings.TrimSpace(sg.str) == "" {
+				switch {
+				case empty: // entire cell empty
+				case sg.prev == ',' && sg.next == ',': // surrounded by commas
+				case sg.prev == ',' && sg.next == 0: // trailing comma
+				case sg.next == ',' && sg.prev == 0: // leading comma
+				default:
+					continue // skip
+				}
+				if !flush() {
+					return
+				}
+				if !yield(sg.str) {
+					return
+				}
+				continue
+			}
+			if have && sg.prev == splitTimesSeqLineSep && !(hasDash(cur) && hasDash(sg.str)) {
+				cur += " " + sg.str // merge range with newline in it
+				continue
+			}
+			if !flush() {
+				return
+			}
+			cur, have = sg.str, true
+		}
+		flush()
+	}
 }
 
 var blockElements = map[string]bool{
@@ -1301,6 +1387,7 @@ func parseClockRange(s string) (r schema.ClockRange, ok bool) {
 	strict := false
 
 	s = strings.ReplaceAll(normalizeText(s, false, true), " ", "")
+	s = strings.TrimRight(s, ".") // the source sometimes ends a line with a period rather than a comma
 
 	// TODO: rewrite this all now that I've decided how the edge cases should behave
 
