@@ -937,7 +937,7 @@ func scheduleCaption(table *goquery.Selection, facilityName string) string {
 	return ""
 }
 
-var playFreeRe = regexp.MustCompile(`(?i)\(?\s*Play\s+Free\s*\)?`)
+var playFreeRe = regexp.MustCompile(`(?i)\*?\(?\s*Play\s+Free\s*\)?`)
 
 // scrapeSchedule scrapes a schedule table, returning nil on failure, and
 // returning a slice of warnings/errors from parsing the schedule.
@@ -986,8 +986,16 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 			}
 			schedule.XDaydates = make([]int32, len(schedule.Days))
 			for i, x := range schedule.Days {
-				if v, ok := parseLooseDate(x); ok {
+				v, ok := parseLooseDate(x)
+				if !ok {
+					if y := strings.TrimSpace(playFreeRe.ReplaceAllString(x, "")); y != x {
+						v, ok = parseLooseDate(y)
+					}
+				}
+				if ok {
 					schedule.XDaydates[i] = int32(v)
+				} else {
+					xerrs = append(xerrs, fmt.Sprintf("warning: failed to parse date from header %q", x))
 				}
 			}
 		} else {
