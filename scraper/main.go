@@ -1963,6 +1963,14 @@ func manualGeocode(name, addr string) (lat, lng float64, ok bool) {
 		return 45.34454, -76.03612, true
 	case strings.HasPrefix(addr, "5717 Rockdale R"):
 		return 45.35600, -75.35150, true
+	case strings.HasPrefix(addr, "109 Larch C"):
+		return 45.48751, -75.52152, true
+	case strings.HasPrefix(addr, "1257 Joseph Drouin A"):
+		return 45.47420, -75.52605, true
+	case strings.HasPrefix(addr, "1485 Duford D"):
+		return 45.47122, -75.50809, true
+	case strings.HasPrefix(addr, "3659 Navan R"):
+		return 45.42747, -75.49196, true
 	}
 	return 0, 0, false
 }
