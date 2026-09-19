@@ -942,6 +942,10 @@ func scheduleCaption(table *goquery.Selection, facilityName string) string {
 
 var playFreeRe = regexp.MustCompile(`(?i)\*?\(?\s*Play\s+Free\s*\)?`)
 
+// note: add more using "|" (explicitly listed to avoid dropping meaningful ones accidentally)
+// note: only used for times, and is preserved in thw raw text for the dataset
+var timeAnnotationRe = regexp.MustCompile(`(?i)\*?\(?\s*(?:no\s+instructor)\s*\)?`)
+
 // scrapeSchedule scrapes a schedule table, returning nil on failure, and
 // returning a slice of warnings/errors from parsing the schedule.
 func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.Schedule, xerrs []string) {
@@ -1052,7 +1056,16 @@ func scrapeSchedule(table *goquery.Selection, facilityName string) (msg *schema.
 						if wkday != -1 {
 							trange.XWkday = new(schema.Weekday(wkday))
 						}
-						if r, ok := parseClockRange(t); ok {
+						r, ok := parseClockRange(t)
+						if !ok {
+							if u := timeAnnotationRe.ReplaceAllString(t, ""); u != t {
+								if r, ok = parseClockRange(u); ok {
+									slog.Warn("note: time range annotation ignored", "raw", t, "parsed", r)
+								}
+								// note: keep the original raw text
+							}
+						}
+						if ok {
 							trange.XStart = new(int32(r.Start))
 							trange.XEnd = new(int32(r.End))
 							if r.Start > 24*60 || r.End > 24*60 {
